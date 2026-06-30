@@ -25,20 +25,20 @@ Each skill directory contains `SKILL.md`, `references/*.md` deep dives, and an `
 
 ```bash
 # 1. add this repo as a plugin marketplace
-/plugin marketplace add OWNER/ops-skills        # or a full git URL
+/plugin marketplace add sidharth4telus/ops-skills        # or a full git URL
 
 # 2. install the plugin (the @ops-skills suffix is the marketplace name)
 /plugin install ops-skills@ops-skills
 ```
 
-Replace `OWNER/ops-skills` with your GitHub `owner/repo`. To update later: `/plugin marketplace update ops-skills`.
+Replace `sidharth4telus/ops-skills` with your GitHub `owner/repo`. To update later: `/plugin marketplace update ops-skills`.
 
 ### Option B — install the skills directly
 
 Copy the skill folders into your personal skills directory:
 
 ```bash
-git clone https://github.com/OWNER/ops-skills.git
+git clone https://github.com/sidharth4telus/ops-skills.git
 cd ops-skills
 ./install.sh                 # copies skills into ~/.claude/skills/
 # or symlink them (stay in sync with the repo):
