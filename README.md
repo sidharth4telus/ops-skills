@@ -31,7 +31,7 @@ Each skill directory contains `SKILL.md`, `references/*.md` deep dives, and an `
 /plugin install ops-skills@ops-skills
 ```
 
-Replace `sidharth4telus/ops-skills` with your GitHub `owner/repo`. To update later: `/plugin marketplace update ops-skills`.
+(If you fork this repo, swap `sidharth4telus/ops-skills` for your own `owner/repo`.) To update later: `/plugin marketplace update ops-skills`.
 
 ### Option B — install the skills directly
 
