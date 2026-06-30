@@ -1,0 +1,23 @@
+{
+  "skill_name": "cloud-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Our CI deploy job started failing this morning with this from the AWS CLI:\n\n  An error occurred (AccessDenied) when calling the PutObject operation: User: arn:aws:iam::111122223333:user/ci-deployer is not authorized to perform: s3:PutObject on resource: arn:aws:s3:::acme-artifacts/builds/app-1.2.3.tar.gz because no identity-based policy allows the s3:PutObject action\n\nNothing changed in the pipeline code that we know of. How do I figure out what's wrong and fix it properly? We use GCP too so keep that in mind for next time.",
+      "expected_output": "Identifies this as an authorization (not auth) failure and parses the error: principal user/ci-deployer, action s3:PutObject, resource arn:aws:s3:::acme-artifacts/builds/app-1.2.3.tar.gz, and notes the reason phrase 'no identity-based policy allows' points at the identity policy (not an explicit deny / resource policy). First runs read-only confirmation: aws sts get-caller-identity (verify it really is ci-deployer / right account) and aws iam simulate-principal-policy with that exact action+resource ARN. Distinguishes implicitDeny (add a grant) from explicitDeny (find the SCP/boundary/bucket-policy that wins). Provides a LEAST-PRIVILEGE fix: an identity policy allowing only s3:PutObject (and likely s3:GetObject/ListBucket scoped to the builds/* prefix) on that specific bucket/prefix ARN — NOT s3:* and NOT Resource '*'. Mentions checking the bucket policy too if the sim says allowed but it still 403s. Should NOT recommend granting admin or AmazonS3FullAccess. Bonus: gives the GCP equivalent (gcloud projects get-iam-policy / roles describe, grant at bucket level).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Write me an idempotent provisioning script that, on both AWS and GCP, ensures an artifacts object-storage bucket exists, has versioning on, and blocks all public access. It needs to be safe to run repeatedly from CI without erroring if the bucket already exists, and I want a dry-run / preview story. Show the gcloud and aws CLI versions, and mention the Terraform option.",
+      "expected_output": "Provides a check-then-act script that does NOT error on re-run: AWS uses 'aws s3api head-bucket ... || create-bucket' (guarded) and then always-idempotent put-bucket-versioning + put-public-access-block with all four block flags true. GCP guards 'gcloud storage buckets describe || create' with --uniform-bucket-level-access, then 'buckets update --versioning'. Explicitly notes that create commands are not idempotent (must be guarded) while the put/update enforcement commands are safe to always run. Addresses dry-run: --dry-run for AWS where applicable and terraform plan -out/apply as the universal preview; mentions a Terraform resource (aws_s3_bucket + versioning + public_access_block, google_storage_bucket with uniform_bucket_level_access + versioning) as the IaC option. Commands must be runnable and correct (e.g. LocationConstraint for non-us-east-1 create-bucket).",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Triage this: instances in our private subnet (AWS, ca-central-1) intermittently time out when calling https://secretsmanager.ca-central-1.amazonaws.com and when fetching from the public internet. They CAN reach other instances in the same VPC fine. dig resolves the hostname OK. We recently 'cleaned up' some VPC resources. Walk me through how you'd diagnose and what the likely root cause is.",
+      "expected_output": "Recognizes timeout = silently dropped packets (a route/NAT/filter problem), not connection refused, and that intra-VPC working + DNS resolving narrows it to egress path to the internet/managed APIs. Walks the layered probe (DNS ok -> route table -> SG egress -> NACL -> NAT -> VPC endpoint) and recommends AWS Reachability Analyzer (create-network-insights-path / start-network-insights-analysis) to pinpoint the blocking hop. Identifies the two likely root causes given 'cleaned up resources': (1) the NAT Gateway / its 0.0.0.0/0 route was deleted so the private subnet lost internet egress; (2) for Secrets Manager specifically, the proper fix is a VPC interface endpoint (PrivateLink) so it stays on the AWS backbone and doesn't need NAT — a deleted endpoint would cause exactly this. Mentions NACL statelessness (ephemeral return ports) as another candidate to check. Concrete confirm commands: describe-route-tables, describe-vpc-endpoints, describe-nat-gateways. Fix: recreate NAT Gateway + default route and/or create the secretsmanager VPC endpoint. Gives GCP analog (Cloud NAT / Private Google Access + connectivity-tests) for the multi-cloud context.",
+      "files": []
+    }
+  ]
+}

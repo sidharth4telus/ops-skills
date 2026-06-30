@@ -1,0 +1,23 @@
+{
+  "skill_name": "redis-saas-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Our Node app suddenly can't talk to our AWS ElastiCache Redis. Logs show:\n\n  Error: Connection is closed.\n      at Redis.<anonymous> ...\n  [ioredis] Unhandled error event: Error: connect ETIMEDOUT\n\nThe connection string is redis://app-prod.xxxx.use1.cache.amazonaws.com:6379. It worked from my laptop on the VPN last week but now fails from the new ECS service. `aws elasticache describe-replication-groups` says TransitEncryptionEnabled is true. Walk me through diagnosing and fixing this.",
+      "expected_output": "Identifies TWO likely root causes and tests them in order: (1) TLS mismatch — TransitEncryptionEnabled=true but the URL uses redis:// (plaintext), so it must be rediss:// / tls enabled in ioredis; (2) network — ECS task security group not allowed inbound on the ElastiCache SG (port 6379), since ElastiCache has no public endpoint and laptop-on-VPN succeeding doesn't prove the ECS path. Must give concrete probes: `nc -vz host 6379` to prove TCP, `redis-cli -h host -p 6379 --tls PING` vs without --tls, and an SG inbound rule fix (authorize the client SG). Should note ETIMEDOUT points to network/SG more than TLS, and that TLS reset usually manifests as connection reset, but covers both. Mentions transit encryption is immutable after create.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Provision a production GCP Memorystore Redis instance with Terraform: 5 GB, highly available with automatic failover, TLS in transit, AUTH enabled, an LRU eviction policy, and RDB snapshots. Also give me the production ioredis client config to connect to it with proper pooling, timeouts, retries, and graceful shutdown.",
+      "expected_output": "Provides a google_redis_instance resource with tier = STANDARD_HA (explicitly NOT BASIC, calling out that Basic has no failover), memory_size_gb = 5, auth_enabled = true, transit_encryption_mode = SERVER_AUTHENTICATION, redis_configs maxmemory-policy = allkeys-lru (or allkeys-lfu), and persistence_config with RDB. Plus an ioredis config: single shared instance, tls enabled (servername set), connectTimeout/commandTimeout, maxRetriesPerRequest + capped exponential retryStrategy, reconnectOnError for READONLY, and SIGTERM -> redis.quit() graceful shutdown. Should mention terraform plan before apply and not hardcoding the password.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Triage this production Redis incident report and tell me what's wrong and how to fix it. We run Redis Cloud cluster mode. App errors over the last hour:\n\n  CROSSSLOT Keys in request don't hash to the same slot\n  ERR max number of clients reached\n  OOM command not allowed when used memory > 'maxmemory'\n\n`INFO` shows: maxmemory_policy:noeviction, connected_clients:9998, evicted_keys:0, used_memory near maxmemory. The code does `mget(\\`user:${id}:name\\`, \\`user:${id}:profile\\`)` and creates `new Redis.Cluster(...)` inside every request handler.",
+      "expected_output": "Diagnoses all three independently: (1) CROSSSLOT — MGET spans slots because user:ID:name and user:ID:profile hash differently; fix with hash tags user:{ID}:name / user:{ID}:profile so they co-locate. (2) max number of clients reached / connected_clients ~9998 — client leak from `new Redis.Cluster()` per request; fix is one shared pooled cluster client per process. (3) OOM — maxmemory_policy:noeviction with full memory; decide cache vs datastore: if cache switch to allkeys-lru (via Redis Cloud DB config, not CONFIG SET), else scale/add TTLs; note evicted_keys:0 is consistent with noeviction. Should prioritize the connection leak as likely amplifying the others and give the exact fixes per item.",
+      "files": []
+    }
+  ]
+}

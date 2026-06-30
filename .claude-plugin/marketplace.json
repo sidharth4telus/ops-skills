@@ -1,0 +1,13 @@
+{
+  "name": "ops-skills",
+  "owner": {
+    "name": "Sidharth Kolanjinathan"
+  },
+  "plugins": [
+    {
+      "name": "ops-skills",
+      "description": "Eight combined debugging + automation skills (python-ops, js-ts-ops, docker-ops, k8s-ops, cloud-ops, redis-saas-ops, cloudfront-ops, dynatrace-ops). Each ships a SKILL.md decision-tree, references/, and an eval suite.",
+      "source": "./plugins/ops-skills"
+    }
+  ]
+}

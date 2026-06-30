@@ -1,0 +1,23 @@
+{
+  "skill_name": "dynatrace-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Pager just fired for our 'checkout' service in Dynatrace. I tried to look at one trace but got nothing back:\n\n  dtctl query 'fetch spans, from: now()-2h | filter trace.id == \"5b8aa5a2d2c872e8321cf37308d69df2\" | fields span.name, duration' -o json --plain\n  -> []  (zero rows, no error)\n\nWalk me through finding root cause, and tell me why that query returned nothing.",
+      "expected_output": "Must identify the bug: trace.id (and span.id) are uid-typed, so `filter trace.id == \"<hex>\"` silently matches nothing; the fix is `fieldsAdd t = toString(trace.id) | filter t == \"<hex>\"`. Must lay out a top-down triage flow rather than blindly grepping: start from the Davis problem (fetch dt.davis.problems, ACTIVE, affected_entity_ids), then RED metrics on checkout via timeseries (dt.service.request.count / failure_count / response_time vs baseline), then fetch failing root spans grouped by exception/endpoint, then correlate to logs and to a deploy/config-change event (fetch events, event.kind DEPLOYMENT) to confirm onset == change time. Should run queries via `dtctl query ... -o json --plain` and reference deferring DQL syntax to dt-dql-essentials and domain field semantics to dt-obs-* skills. Should NOT declare root cause without aligning regression onset with the change.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "We keep manually checking the Dynatrace dashboard every morning to see which services blew their error budget overnight. Automate it: every day at 8am, run a DQL check over the last 24h for services above 1% error rate and post the list to Slack #sre-alerts. Also give me a reusable error-rate dashboard I can apply with dtctl.",
+      "expected_output": "Must provide a Workflow YAML (type: workflow) with a cron schedule trigger (~0 8 * * *), an execute-dql-query task computing error rate per service over now()-24h from dt.service.request.count / failure_count and filtering err_pct > 1, and a Slack notify task gated on a condition. Must show idempotent deploy via `dtctl apply -f ... --set env=prod`, plus `dtctl exec workflow <id>` to run on demand and `dtctl logs workflow-execution` to inspect. Must provide a dashboard YAML (type: dashboard) with a data tile whose query is the error-rate timeseries, noting davis.enabled:false on data tiles and quoting \"y\" in layouts. Should follow the build->verify->diff->apply loop (verify query / diff before apply) and keep the resource id in the file so apply upserts. Should defer CLI mechanics to dtctl and DQL syntax to dt-dql-essentials.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "A teammate wrote this DQL to find the slowest trace and then triage it, but says results look wrong/empty. Review it and tell me what to fix:\n\n  fetch spans, from: now()-2h\n  | filter dt.service.name == \"checkout\"\n  | summarize by:{endpoint.name}\n  | sort durations desc\n  | fieldsAdd last = latencies[count-1]\n  | filter trace.id == topTrace\n\nThen tell me whether the p95 latency we're seeing is in checkout itself or a downstream dependency.",
+      "expected_output": "Must catch multiple gotchas: (a) `summarize by:{endpoint.name}` has no aggregation and errors — needs e.g. `summarize p95=percentile(duration,95), n=count(), by:{endpoint.name}`; (b) array index must be a literal — `latencies[count-1]` is illegal, use `latencies[-1]` for last; (c) `filter trace.id == topTrace` won't match because trace.id is uid — must `fieldsAdd t = toString(trace.id) | filter t == \"<hex>\"`. For the self-vs-downstream question, must explain comparing span duration to span.timing.cpu_self on the slow root span: cpu_self ~= duration => CPU-bound in checkout itself; duration >> cpu_self => waiting on a downstream/DB call, then follow the trace tree (expand spans by trace id, read top-down, find the dominant client-kind hop) to identify which service. Should reference dt-obs-tracing for span fields and dt-dql-essentials for syntax.",
+      "files": []
+    }
+  ]
+}

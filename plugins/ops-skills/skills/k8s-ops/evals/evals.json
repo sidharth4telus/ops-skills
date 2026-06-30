@@ -1,0 +1,23 @@
+{
+  "skill_name": "k8s-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My pod won't stay up. `kubectl get pods -n prod` shows:\n\nNAME             READY   STATUS             RESTARTS       AGE\npayments-6c8f9   0/1     CrashLoopBackOff   6 (25s ago)    4m\n\nAnd `kubectl describe pod payments-6c8f9 -n prod` ends with:\n\n  State:          Waiting\n    Reason:       CrashLoopBackOff\n  Last State:     Terminated\n    Reason:       Error\n    Exit Code:    137\n    Started:      Mon, 30 Jun 2026 09:14:01\n    Finished:     Mon, 30 Jun 2026 09:14:09\n  Limits:\n    memory:  128Mi\n  Requests:\n    memory:  128Mi\n\nHow do I figure out what's wrong and fix it?",
+      "expected_output": "Identifies exit code 137 = SIGKILL and that with only 128Mi limit it is almost certainly OOMKilled. Tells the user to confirm with `kubectl get pod payments-6c8f9 -n prod -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'` (expecting OOMKilled) and to check usage with `kubectl top pod ... --containers` and `kubectl logs payments-6c8f9 -n prod --previous`. Root cause: container exceeded its memory limit. Fix: raise limits/requests.memory to observed peak plus headroom, set the runtime heap relative to the limit (e.g. -XX:MaxRAMPercentage=75 or --max-old-space-size), and investigate a possible leak rather than only raising the ceiling. Should show a corrected resources block.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I have a stateless HTTP service `orders` (listens on container port 8080, exposes /healthz and /readyz). Write me the Kubernetes manifests for a production deployment in the `prod` namespace: a Deployment with 3 replicas and zero-downtime rolling updates, proper resource requests/limits, startup/readiness/liveness probes, a ClusterIP Service, an HPA that scales 3-15 on 70% CPU, and a PodDisruptionBudget. Then give me the exact command to deploy it idempotently with automatic rollback if it fails.",
+      "expected_output": "Produces apps/v1 Deployment with replicas:3, RollingUpdate maxUnavailable:0/maxSurge:1, requests AND limits for cpu+memory, a startupProbe gating readinessProbe + livenessProbe on /readyz and /healthz at port 8080 (liveness more lenient than readiness), matching selector/pod labels. A v1 Service (ClusterIP) whose selector matches the pod labels with port mapping to targetPort 8080. An autoscaling/v2 HorizontalPodAutoscaler scaleTargetRef the Deployment, minReplicas:3 maxReplicas:15, CPU Utilization 70. A policy/v1 PodDisruptionBudget with minAvailable. Deploy command uses `kubectl apply` (or helm upgrade --install --atomic) plus `kubectl rollout status ... --timeout` with `kubectl rollout undo` on failure, i.e. an idempotent apply-then-wait-then-rollback flow.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Triage this for me: users report our app at https://shop.example.com returns 503. The Service and pods look like they exist. Here's what I have:\n\n$ kubectl get pods -n shop\nNAME            READY   STATUS    RESTARTS   AGE\nweb-7f4c-aaa    0/1     Running   0          6m\nweb-7f4c-bbb    0/1     Running   0          6m\n\n$ kubectl get endpoints web -n shop\nNAME   ENDPOINTS   AGE\nweb    <none>      6m\n\n$ kubectl describe ingress web -n shop\n... Rules: shop.example.com / web:80 ...\n\nWalk me through root cause and the fix.",
+      "expected_output": "Connects the dots: Ingress 503 = backend Service has no ready endpoints. Endpoints <none> while pods exist, and pods are Running but 0/1 READY, means the readiness probe is failing so no pod is added to endpoints (not primarily a selector mismatch, though it should still verify the selector matches pod labels with `kubectl describe svc web` + `kubectl get pods --show-labels`). Directs to inspect readiness failures via `kubectl describe pod web-7f4c-aaa -n shop` (probe events) and logs. Root cause: failing readiness probe (wrong path/port, app not ready, or binding 127.0.0.1 instead of 0.0.0.0). Fix: correct the readiness probe / app bind so pods go Ready, endpoints populate, and the 503 clears. Bonus: mentions adding a startupProbe for slow boot and verifying with `kubectl get endpoints web -n shop` after the fix.",
+      "files": []
+    }
+  ]
+}

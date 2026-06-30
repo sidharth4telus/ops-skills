@@ -1,0 +1,23 @@
+{
+  "skill_name": "python-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My async scraper hangs and prints this warning, and only one URL is ever fetched at a time even though I created tasks for 50 URLs:\n\n```\nsys:1: RuntimeWarning: coroutine 'fetch' was never awaited\n```\n\nHere is the code:\n\n```python\nimport asyncio, requests\n\nasync def fetch(url):\n    return requests.get(url).text\n\nasync def main(urls):\n    results = []\n    for u in urls:\n        results.append(fetch(u))   # gather later\n    return await asyncio.gather(results)\n```\n\nWhy is it slow/warning, and how do I fix it so all 50 fetch concurrently?",
+      "expected_output": "Must identify TWO distinct bugs: (1) `requests.get` is a SYNCHRONOUS blocking call running on the event loop, so it serializes everything and stalls the loop — fix is to offload via `await asyncio.to_thread(requests.get, url)` or switch to an async client like httpx.AsyncClient/aiohttp; (2) `asyncio.gather(results)` is passed a list instead of unpacked args, and the coroutines were never awaited/scheduled — fix is `asyncio.gather(*results)` (or create_task / TaskGroup). Should explain the 'coroutine was never awaited' warning comes from un-awaited coroutine objects. Bonus: mention `python -W error` to surface the stack, PYTHONASYNCIODEBUG=1 to detect loop blocking, and asyncio.TaskGroup (3.11+) as the robust structured-concurrency option. Should provide corrected runnable code.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Write me a production-quality Python 3.11 CLI tool called `cleanup-logs` that deletes log files older than N days under a directory. It must support a --dry-run flag (default safe), structured logging with -v/-vv verbosity, a non-zero exit code on failure, and be safe to re-run. Also give me the pyproject.toml so I can install it with pipx and run it as `cleanup-logs`.",
+      "expected_output": "Must provide a CLI (argparse, click, or typer) with: a required directory arg and a days/age option; a `--dry-run` flag that logs intended deletions but does NOT delete; `-v`/`--verbose` count-based verbosity mapped to logging levels; `logging.basicConfig(..., force=True)` configured once; deletions gated behind `if not dry_run`; idempotent/re-runnable behavior (missing files tolerated, e.g. missing_ok or try/except); a `main()` returning an int exit code with `raise SystemExit(main())` and exception handling (logging.exception, return 1). The pyproject.toml must use PEP 621 `[project]`, `requires-python = \">=3.11\"`, and a `[project.scripts]` entry point mapping `cleanup-logs` to the function. Should mention `python -m build` + `pipx install .`. Code must be runnable and use pathlib + timestamps (mtime), ideally tz-aware comparisons.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Review this long-running worker. It's leaking memory (RSS grows from 200MB to 4GB over a day) and someone reports its logs sometimes appear twice and sometimes not at all. Triage both problems and tell me what to fix.\n\n```python\nimport logging, functools\n\nCACHE = []\n\n@functools.lru_cache()\ndef render(template, ctx):\n    return template.format(**ctx)\n\ndef process(event):\n    logging.basicConfig(level=logging.INFO)\n    logging.info(f\"processing {event['id']}\")\n    CACHE.append(event)              # keep for audit\n    return render(event['tpl'], tuple(event['ctx'].items()))\n```",
+      "expected_output": "Memory: must flag (1) the module-level `CACHE = []` that grows unbounded forever — needs eviction/bounded size or removal; (2) `@functools.lru_cache()` with NO maxsize (defaults to unbounded) caching every distinct (template, ctx) → unbounded growth, fix with `maxsize=` or remove. Should recommend confirming with tracemalloc snapshot diff and/or objgraph.show_growth / show_backrefs to find the referrer. Logging: must flag that `logging.basicConfig` is called INSIDE `process` on every event — first call configures the root logger, later calls are no-ops (so config/level depends on first invocation; duplicate handlers can arise if combined with other config) — fix is to call basicConfig ONCE at the entrypoint (with force=True if needed), not per-event; this explains intermittent missing/duplicate logs. Bonus: note the f-string in logging.info eagerly formats even when suppressed (use `logging.info(\"processing %s\", event['id'])`).",
+      "files": []
+    }
+  ]
+}

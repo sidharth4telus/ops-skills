@@ -1,0 +1,23 @@
+{
+  "skill_name": "docker-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My container keeps dying. `docker ps -a` shows it as `Exited (137) 3 seconds ago`. The Dockerfile ends with `CMD [\"node\", \"server.js\"]` and I run it with `docker run --memory=256m my-api`. `docker logs` is empty. What's wrong and how do I fix it?",
+      "expected_output": "Identifies exit 137 = 128+9 = SIGKILL, almost certainly OOMKilled. Tells the user to confirm with `docker inspect --format '{{.State.OOMKilled}}' <ctr>` (expects true) and check usage vs the 256m limit with `docker stats`. Root cause: the Node process exceeded the 256m cgroup limit, so the kernel OOM killer killed it (empty logs are consistent with SIGKILL leaving no graceful output). Fixes: raise `--memory`, and/or set Node's `--max-old-space-size` below the container limit so the runtime is aware of the cgroup, and/or fix the memory leak. Should note that with no limit set, 137 could instead mean host-level OOM or `docker stop` escalation.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Write me a production Dockerfile for a TypeScript Node.js API (build step with `npm run build` producing dist/, then run `node dist/server.js`). It needs to be small, build fast on repeated builds, run as a non-root user, and not leak the npm auth token I need for a private registry. Also give me the .dockerignore.",
+      "expected_output": "A multi-stage Dockerfile with `# syntax=docker/dockerfile:1`: a build stage (npm ci + npm run build), a deps stage installing prod-only deps (`npm ci --omit=dev`), and a slim runtime stage copying only node_modules + dist. Copies package*.json before source to preserve the dependency cache layer. Uses a BuildKit cache mount (`RUN --mount=type=cache,target=/root/.npm`). Handles the private-registry token via BuildKit secret (`RUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm ci` + the corresponding `docker build --secret` invocation) — NOT via --build-arg or ENV (which would leak into history). Runs as a non-root user (`USER node`). Uses exec-form CMD `[\"node\",\"dist/server.js\"]`. Provides a .dockerignore that excludes at least .git, node_modules, dist, .env*, and Dockerfile.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Review this Dockerfile for problems:\n\n```dockerfile\nFROM node:latest\nWORKDIR /app\nCOPY . .\nRUN npm install\nENV API_KEY=sk-prod-9f3a2b\nEXPOSE 3000\nCMD npm start\n```\n\nWe can't reach the app on port 3000 from the host, the image is 1.4GB, and `docker stop` takes 10 seconds every time.",
+      "expected_output": "Triage covering, at minimum: (1) `CMD npm start` is shell-form → npm/sh becomes PID 1 and doesn't forward SIGTERM, so `docker stop` waits the 10s grace then SIGKILLs — fix with exec form invoking node directly, or `exec` in a script, or `--init`/tini. (2) `API_KEY` baked into ENV is a leaked secret in the image (visible via `docker history`/`env`) — remove it, rotate the key, inject at runtime or via BuildKit secret. (3) Size 1.4GB: `node:latest` is the full (non-slim) image and `COPY . . before npm install` busts the dep cache; recommend a `-slim` or multi-stage build, copy package*.json first, `npm ci --omit=dev`, .dockerignore. (4) Port unreachable: `EXPOSE` only documents — must publish with `-p 3000:3000`, and the app must listen on 0.0.0.0 not 127.0.0.1. (5) `node:latest` is unpinned/non-reproducible — pin a version (and ideally a digest). (6) No USER → runs as root; add a non-root user.",
+      "files": []
+    }
+  ]
+}

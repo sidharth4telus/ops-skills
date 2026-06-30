@@ -1,0 +1,12 @@
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# packaged skill artifacts
+*.skill
+
+# scratch
+*.log
+.tmp/

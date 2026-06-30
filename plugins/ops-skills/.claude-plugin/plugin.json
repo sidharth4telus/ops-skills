@@ -1,0 +1,27 @@
+{
+  "name": "ops-skills",
+  "version": "1.0.0",
+  "description": "Combined debugging + automation skills for Claude Code, one per technology: python-ops, js-ts-ops, docker-ops, k8s-ops, cloud-ops (AWS+GCP), redis-saas-ops, cloudfront-ops, dynatrace-ops. Each skill is a symptom-to-fix decision tree plus copy-pasteable automation.",
+  "author": {
+    "name": "Sidharth Kolanjinathan"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "skills",
+    "debugging",
+    "automation",
+    "devops",
+    "sre",
+    "python",
+    "typescript",
+    "nodejs",
+    "docker",
+    "kubernetes",
+    "aws",
+    "gcp",
+    "redis",
+    "cloudfront",
+    "dynatrace"
+  ]
+}

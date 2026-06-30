@@ -1,0 +1,23 @@
+{
+  "skill_name": "js-ts-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Our Node 20 service intermittently crashes with this and nothing in our code shows in the trace. We're on ESM. What's happening and how do I find the culprit and fix it?\n\nnode:internal/process/promises:288\n            triggerUncaughtException(err, true /* fromPromise */);\n            ^\nUnhandledPromiseRejection: This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch().\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)\n\nThe relevant code is:\n\nusers.forEach(async (u) => {\n  await sendWelcomeEmail(u);\n});",
+      "expected_output": "Must identify that `array.forEach(async ...)` drops the returned promise so a rejection from sendWelcomeEmail goes unhandled. Must recommend replacing forEach with `for...of` (sequential) or `await Promise.all(users.map(...))` (parallel). Must give a command to locate it, e.g. `node --unhandled-rejections=strict` and/or `--trace-warnings` / raising `--stack-trace-limit`, and chaining errors with `{ cause }`. Should note a `process.on('unhandledRejection')` handler must exit non-zero, not log-and-continue.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Set up CI and build automation for a TypeScript library targeting Node 20 that we publish to npm. We use pnpm. I want: a fast bundle that emits both ESM and CJS with source maps and type declarations, a typecheck + lint + test gate, a GitHub Actions workflow that won't drift from the lockfile, and automated versioned releases. Give me the concrete config files.",
+      "expected_output": "Must provide a tsup (or esbuild) config emitting both esm and cjs with `sourcemap: true` and `dts: true`. Must include package.json scripts for typecheck (`tsc --noEmit`), lint, test, build. Must give a GitHub Actions workflow using `pnpm install --frozen-lockfile` (not plain install) and Node 20 with pnpm cache. Must use Changesets (`changeset version` + `changeset publish`) for release automation. Should emphasize idempotency and that source maps are required for readable prod traces.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Review/triage: our Vitest suite passes locally but in CI it hangs with `Vitest did not exit gracefully` and one test, `creates a session`, fails maybe 1 in 10 runs. The test starts an HTTP server and a pg Pool, and uses `new Date()` to assert a timestamp. What's wrong and how do I make it deterministic and clean?",
+      "expected_output": "Must diagnose two issues: (1) open handles — the HTTP server and pg Pool aren't closed, keeping the process alive; fix with `afterAll(async () => { await server.close(); await pool.end(); })` and confirm via `--detectOpenHandles` (Jest) / verbose run, plus clearing any intervals. (2) Flake from real time — recommend `vi.useFakeTimers()`/restore in before/afterEach (or inject a clock) so the timestamp assertion is deterministic. Should suggest reproducing with serial runs (`--no-file-parallelism`) to isolate shared-state vs ordering bugs, and restoring mocks in afterEach.",
+      "files": []
+    }
+  ]
+}

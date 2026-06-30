@@ -1,0 +1,23 @@
+{
+  "skill_name": "cloudfront-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Our static site behind CloudFront has a terrible cache hit ratio (~35%) and our origin (S3) bill keeps climbing. Here's a sample of the access log and the cache policy. What's wrong and how do I fix it?\n\nAccess log rows (result_type, uri, query):\n  Miss\t/app.js\tutm_source=newsletter&utm_campaign=june\n  Miss\t/app.js\tutm_source=twitter&fbclid=IwAR9\n  Miss\t/app.js\tgclid=Cj0KCQ&utm_medium=cpc\n  Miss\t/style.css\t_ga=GA1.2.99\n\n  $ aws cloudfront get-cache-policy --id abc123 --query 'CachePolicy.CachePolicyConfig.ParametersInCacheKeyAndForwardedToOrigin'\n  { \"QueryStringsConfig\": { \"QueryStringBehavior\": \"all\" },\n    \"HeadersConfig\": { \"HeaderBehavior\": \"none\" },\n    \"CookiesConfig\": { \"CookieBehavior\": \"all\" } }",
+      "expected_output": "Identifies that QueryStringBehavior:all puts every tracking param (utm_*, fbclid, gclid, _ga) into the cache key, so the same /app.js is cached as a distinct entry per marketing URL, plus CookieBehavior:all forks the cache per session cookie. Recommends switching query strings to 'none' (or a whitelist of body-affecting params only) and cookies to 'none' for static assets, distinguishing cache key vs origin-request-policy forwarding. Bonus: recommends versioned/fingerprinted asset filenames (app.<hash>.js) with Cache-Control: max-age=31536000, immutable so the key is stable and hit ratio approaches ~100%. Notes how to verify (re-curl twice, expect x-cache: Hit and rising Age).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Write me a production-grade CI deploy script for a Vite SPA. It should sync the build to S3 and make CloudFront serve the new version correctly. We keep redeploying and either users get stale index.html or we waste money invalidating /* every time. Distribution id is E2ABCDEF, bucket is my-spa-prod.",
+      "expected_output": "Provides a bash script (set -euo pipefail) that: syncs hashed assets with Cache-Control public,max-age=31536000,immutable; syncs index.html (and sw.js if present) with a short/no-cache Cache-Control; creates an invalidation ONLY for the unversioned entry paths (e.g. /index.html, /, /sw.js) NOT /*; and waits for completion with 'aws cloudfront wait invalidation-completed'. Explains why versioned asset keys mean no invalidation is needed for assets and why /* is wasteful/billed. Script is idempotent (same finite path list every run).",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Triage this incident: users intermittently get a 403 AccessDenied page on images served via CloudFront from our private S3 bucket; it started right after we turned on S3 Block Public Access. Here's the config dump. Tell me what's broken and the fix.\n\n  $ aws cloudfront get-distribution-config --id E9 --query 'DistributionConfig.Origins.Items[0]'\n  { \"DomainName\": \"my-bucket.s3-website-us-east-1.amazonaws.com\",\n    \"OriginAccessControlId\": \"\",\n    \"S3OriginConfig\": { \"OriginAccessIdentity\": \"\" } }\n\n  $ aws s3api get-bucket-policy --bucket my-bucket\n  An error occurred (NoSuchBucketPolicy)",
+      "expected_output": "Diagnoses two compounding problems: (1) the origin is the S3 *website* endpoint (s3-website-us-east-1), which does NOT support OAC/OAI and requires public objects — so Block Public Access broke it; and (2) there is no OAC/OAI configured and no bucket policy, so CloudFront has no authorized way to read the now-private bucket. Fix: switch the origin to the S3 REST endpoint (my-bucket.s3.us-east-1.amazonaws.com), attach an Origin Access Control with SigV4 signing, and add a bucket policy allowing the cloudfront.amazonaws.com service principal scoped with an AWS:SourceArn condition to the distribution ARN. Mentions keeping Block Public Access ON is correct. Bonus: SSE-KMS would also need kms:Decrypt for the service principal; verify with curl -sSI expecting 200.",
+      "files": []
+    }
+  ]
+}
