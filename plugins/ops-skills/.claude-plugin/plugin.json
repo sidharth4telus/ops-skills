@@ -1,7 +1,7 @@
 {
   "name": "ops-skills",
   "version": "1.0.0",
-  "description": "Combined debugging + automation skills for Claude Code, one per technology: python-ops, js-ts-ops, docker-ops, k8s-ops, cloud-ops (AWS+GCP), redis-saas-ops, cloudfront-ops, dynatrace-ops, model-router. Each *-ops skill is a symptom-to-fix decision tree plus copy-pasteable automation; model-router routes tasks to the right-sized Claude model by cost/complexity.",
+  "description": "Combined debugging + automation skills for Claude Code, one per technology: python-ops, js-ts-ops, docker-ops, k8s-ops, cloud-ops (AWS+GCP), redis-saas-ops, cloudfront-ops, dynatrace-ops, plus general-purpose model-router and prompt-engineering-expert skills. Each *-ops skill is a symptom-to-fix decision tree plus copy-pasteable automation; model-router routes tasks to the right-sized Claude model by cost/complexity; prompt-engineering-expert refines prompts and agent instructions.",
   "author": {
     "name": "Sidharth Kolanjinathan"
   },
@@ -23,6 +23,7 @@
     "redis",
     "cloudfront",
     "dynatrace",
-    "model-router"
+    "model-router",
+    "prompt-engineering"
   ]
 }

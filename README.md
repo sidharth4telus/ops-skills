@@ -15,6 +15,7 @@ A family of `*-ops` skills — one per technology — that each combine **debugg
 | **cloudfront-ops** | CloudFront/CDN: cache hit-ratio, invalidations vs versioned keys, OAC/origin 403, 502/503/504, signed URLs/cookies, CORS, redirect loops — plus distribution-as-code, CI invalidation, Athena log analysis. |
 | **dynatrace-ops** | Incident-investigation playbooks (problem → impacted entities → failing services → failure traces → RCA) and observability-as-code (dtctl, DQL, dashboards/notebooks/SLOs/Workflows). Orchestrates the `dt-*` skills. |
 | **model-router** | Routes a task to the right-sized model instead of one-size-fits-all: classifies task complexity and delegates to a subagent on Haiku (cheap/mechanical), Sonnet (default), or Opus (deep reasoning) via the Agent tool. Asks the user to pick low-cost vs. high-cost, with tradeoffs explained, only when they signal quality matters but haven't chosen a model. |
+| **prompt-engineering-expert** | Prompt/context engineering for LLM and agent instructions: writing, refining, and debugging system prompts, few-shot examples, and RAG context, plus proactively sharpening ambiguous or high-stakes task requests before acting on them. |
 
 Each skill directory contains `SKILL.md`, `references/*.md` deep dives, and an `evals/evals.json` eval suite.
 
