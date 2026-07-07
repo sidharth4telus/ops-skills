@@ -34,6 +34,26 @@ For everything else, don't ask — pick the tier yourself and delegate. Most tas
 
 Route via the Agent tool, setting `model` to `haiku`, `sonnet`, or `opus` and writing a self-contained prompt for the subagent (it has no memory of this conversation — brief it like a new hire, per standard Agent tool usage). Report the result back to the user; you don't need to announce which tier you picked unless it's relevant or the user asks.
 
+## Step 3: Report the approximate savings
+
+Every completed subagent task comes with a usage notification containing `total_tokens`. Use that to give a one-line estimate, at the end of your reply, of what routing saved versus just running everything on Opus (the tier you'd reach for by default if this skill didn't exist).
+
+Blended $/MTok rates (weighted ~75% input / 25% output, a rough agentic-workload mix — not exact, since the usage notification doesn't split input from output):
+
+| Tier | Blended rate |
+|------|-------------|
+| Haiku | ~$2/MTok |
+| Sonnet | ~$4.75/MTok |
+| Opus | ~$10/MTok |
+
+(Sourced from published per-token pricing as of July 2026 — check [platform.claude.com/docs/en/about-claude/pricing](https://platform.claude.com/docs/en/about-claude/pricing) if these look stale, since list prices do change.)
+
+For each subagent call: `cost = total_tokens × blended_rate[tier_used] / 1,000,000`. Sum across all subagent calls in the task for the actual total. Compute a baseline by re-pricing that same token total at the Opus rate. Report the difference:
+
+`~$0.03 saved (Sonnet instead of Opus for this task, ~55% cheaper).`
+
+If the task was routed to Opus (no cheaper tier used), there's nothing to report — skip the line entirely rather than saying "$0 saved." If the task didn't go through a subagent at all (handled directly, or too small to delegate), skip it too — this is about the routing decision, not a running total across the whole conversation. Keep it to one line; this is a courtesy footnote, not a report.
+
 ## Edge cases
 
 - **Task complexity is genuinely unclear:** default to Sonnet rather than asking — asking adds friction for the majority of tasks where the default is fine. Only escalate to a question when the user's own words signal they care about the quality/cost tradeoff (Step 1).
